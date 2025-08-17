@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Blob Background</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+    
+    <style>
+        html {
+            font-size: 16px; /* root of rem */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            width: 100%;
+            font-family: 'Inter', sans-serif;
+            color: #121212;
+            background: linear-gradient(13deg, #f9d1d1, #e2c3fa, #ffeef6, #dac3fc); /* The blobs are a separate div component */
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        .blob-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)); /* Semi-transparent background */
+            backdrop-filter: blur(1rem);
+            -webkit-backdrop-filter: blur(1rem);
+            padding: 1.5rem 0;
+            box-shadow: 0 1rem 2rem 0 rgba(0, 0, 0, 0.125);
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            background-color 0.3s ease;
+        }
+
+        /* Header hidden state - will be applied via JavaScript */
+        .header-hidden {
+            transform: translateY(-100%);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+            font-weight: bold;
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        nav ul li {
+            margin-left: 2rem;
+        }
+
+        nav ul li a {
+            color: #121212;
+            font-size: 1.2rem;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        nav ul li a:hover {
+            color: #836fa9;
+        }
+        
+        .content {
+            position: relative;
+            z-index: 10;
+            padding: 10vh 5vw;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-top: 6rem;
+            margin-bottom: 6rem;
+            line-height: 1.2;
+            text-align: center;
+        }
+        
+        .section {
+            /* min-height: 80vh; */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 5vh;
+            padding: 1rem;
+
+            /* This will give a rounded glass effect */
+            border-radius: 1rem;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)); /* Instead of "background-color: rgba(255, 255, 255, 0.1);" we have a gradient instead */
+            box-shadow: 0 0.5rem 2rem 0 rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(1rem);
+            -webkit-backdrop-filter: blur(1rem);
+
+            /* Animation properties */
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        
+        /* Class that will be added when the element is visible */
+        .section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        p {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Responsive Card Styles */
+        .card {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 5vh;
+
+            /* This will give a rounded glass effect */
+            border-radius: 1rem;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1)); /* Instead of "background-color: rgba(255, 255, 255, 0.1);" we have a gradient instead */
+            box-shadow: 0 0.5rem 2rem 0 rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(1rem);
+            -webkit-backdrop-filter: blur(1rem);
+            overflow: hidden;
+
+            /* Animation properties */
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        /* Class that will be added when the element is visible */
+        .card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .card-image {
+            width: 100%;
+            height: 250px;
+            overflow: hidden;
+        }
+        
+        .card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+        }
+        
+        .card-content {
+            padding: 1.5rem;
+        }
+        
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.75rem;
+            color: #121212;
+        }
+        
+        .card-text {
+            color: #121212;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        /* Testimonial Carousel Styles */
+        .testimonial-section {
+            margin-bottom: 5vh;
+            padding: 2rem;
+            border-radius: 1rem;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+            box-shadow: 0 0.5rem 2rem 0 rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(1rem);
+            -webkit-backdrop-filter: blur(1rem);
+            overflow: hidden;
+            
+            /* Animation properties */
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        
+        .testimonial-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .testimonial-title {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .testimonial-title h2 {
+            font-size: 2rem;
+            color: #121212;
+            margin-bottom: 1rem;
+        }
+        
+        .testimonial-title p {
+            font-size: 1.2rem;
+            color: #121212;
+            opacity: 0.8;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .testimonial-slider {
+            position: relative;
+            width: 100%;
+        }
+        
+        .testimonial-track {
+            display: flex;
+            width: max-content;
+            animation: slide 45s linear infinite;
+        }
+        
+        @keyframes slide {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-50%);
+            }
+        }
+        
+        .testimonial-card {
+            flex: 0 0 350px;
+            margin: 0 20px;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 2rem 0 rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(1rem);
+            -webkit-backdrop-filter: blur(1rem);
+        }
+        
+        .testimonial-content {
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+            color: #121212;
+            line-height: 1.6;
+        }
+        
+        .testimonial-rating {
+            color: #836fa9;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .testimonial-author {
+            display: flex;
+            align-items: center;
+        }
+        
+        .author-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin-right: 1rem;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+        }
+        
+        .author-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .author-info h4 {
+            font-size: 1.1rem;
+            color: #121212;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+        
+        .author-info p {
+            font-size: 0.9rem;
+            color: #121212;
+            opacity: 0.7;
+            margin: 0;
+        }
+        
+        /* Media query for tablet and larger screens */
+        @media (min-width: 500px) {
+            .card {
+                flex-direction: row;
+            }
+            
+            .card-image {
+                width: 33%;
+                height: auto;
+            }
+            
+            .card-content {
+                width: 67%;
+            }
+        }
+        
+        /* Media query for desktop screens */
+        @media (min-width: 1024px) {
+            .card-image {
+                width: 25%;
+            }
+            
+            .card-content {
+                width: 75%;
+            }
+        }
+        
+        /* Media query for very large screens */
+        @media (min-width: 1440px) {
+            .card-image {
+                width: 20%;
+            }
+            
+            .card-content {
+                width: 80%;
+            }
+        }
+
+        /* Responsive testimonial cards */
+        @media (max-width: 768px) {
+            .testimonial-card {
+                flex: 0 0 300px;
+                padding: 1.5rem;
+            }
+            
+            .testimonial-title h2 {
+                font-size: 1.8rem;
+            }
+            
+            .testimonial-title p {
+                font-size: 1.1rem;
+            }
+        }
+
+        /* Footer styles */
+        footer {
+            position: relative;
+            z-index: 10;
+            margin-top: 5rem;
+            padding: 3rem 0;
+            width: 100%;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+            backdrop-filter: blur(1rem);
+            -webkit-backdrop-filter: blur(1rem);
+            box-shadow: 0 -0.5rem 2rem 0 rgba(0, 0, 0, 0.1);
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            padding: 0 1.5rem;
+        }
+
+        .footer-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-section h3 {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+            color: #121212;
+        }
+
+        .footer-section p, .footer-section a {
+            font-size: 1rem;
+            line-height: 1.5;
+            color: #121212;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-section a:hover {
+            color: #836fa9;
+        }
+
+        .footer-section ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .footer-section ul li {
+            margin-bottom: 0.5rem;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .social-links a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transition: background 0.3s ease;
+        }
+
+        .social-links a:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
+
+    </style>
+</head>
+<body>
+    <!-- Blobs -->
+    <div class="blob-container">
+        <canvas id="blob-canvas"></canvas>
+    </div>
+    
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="logo">J. Rose</div>
+            <nav>
+                <ul>
+                    <li><a href="#">Home</a></li>
+                    <li><a href="#">About Me</a></li>
+                    <li><a href="#">Portfolio</a></li>
+                    <li><a href="#">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+        <h1>"I like nonsense; it wakes up the brain cells." – Dr. Seuss</h1>
+        
+        <!-- First section replaced with responsive card -->
+        <div class="card">
+            <div class="card-image">
+                <img src="me_in_york.jpg" alt="Card image">
+            </div>
+            <div class="card-content">
+                <h2 class="card-title">Responsive Card Design</h2>
+                <p class="card-text">
+                    This responsive card layout seamlessly adapts to different screen sizes. On mobile devices, the image appears on top with the text below. As the viewport widens, the layout shifts to horizontal.
+                </p>
+                <p class="card-text">
+                    The text section dynamically expands as the screen gets wider, taking up an increasingly larger proportion of the available space while maintaining the glass-like aesthetic of the site.
+                </p>
+            </div>
+        </div>
+        
+                <!-- Testimonial Carousel Section -->
+        <div class="testimonial-section">
+            <div class="testimonial-title">
+                <h2>What People Say</h2>
+                <p>Discover what others think about my work and approach.</p>
+            </div>
+            
+            <div class="testimonial-slider">
+                <div class="testimonial-track">
+                    <!-- Testimonial Card 1 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★★</div>
+                        <div class="testimonial-content">
+                            "Working with Jacob was an absolute pleasure. His creative approach and attention to detail transformed our project beyond our expectations."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="Sarah Johnson">
+                            </div>
+                            <div class="author-info">
+                                <h4>Sarah Johnson</h4>
+                                <p>Creative Director</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Testimonial Card 2 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★★</div>
+                        <div class="testimonial-content">
+                            "The level of professionalism and creativity was outstanding. Jacob delivered exactly what we needed, on time and with exceptional quality."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="Michael Chen">
+                            </div>
+                            <div class="author-info">
+                                <h4>Michael Chen</h4>
+                                <p>Brand Manager</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Testimonial Card 3 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★☆</div>
+                        <div class="testimonial-content">
+                            "Jacob's unique perspective and innovative solutions helped us see our project in a completely new light. Highly recommended!"
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="Emily Rodriguez">
+                            </div>
+                            <div class="author-info">
+                                <h4>Emily Rodriguez</h4>
+                                <p>Design Lead</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Testimonial Card 4 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★★</div>
+                        <div class="testimonial-content">
+                            "From concept to completion, Jacob's expertise and dedication made the entire process smooth and enjoyable. Outstanding work!"
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="David Wilson">
+                            </div>
+                            <div class="author-info">
+                                <h4>David Wilson</h4>
+                                <p>Project Manager</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Testimonial Card 5 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★★</div>
+                        <div class="testimonial-content">
+                            "Jacob's attention to detail and creative vision exceeded all expectations. The final result was truly remarkable."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="Lisa Thompson">
+                            </div>
+                            <div class="author-info">
+                                <h4>Lisa Thompson</h4>
+                                <p>Marketing Director</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Duplicate cards for infinite loop effect -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★★</div>
+                        <div class="testimonial-content">
+                            "Working with Jacob was an absolute pleasure. His creative approach and attention to detail transformed our project beyond our expectations."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="Sarah Johnson">
+                            </div>
+                            <div class="author-info">
+                                <h4>Sarah Johnson</h4>
+                                <p>Creative Director</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★★</div>
+                        <div class="testimonial-content">
+                            "The level of professionalism and creativity was outstanding. Jacob delivered exactly what we needed, on time and with exceptional quality."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="Michael Chen">
+                            </div>
+                            <div class="author-info">
+                                <h4>Michael Chen</h4>
+                                <p>Brand Manager</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★☆</div>
+                        <div class="testimonial-content">
+                            "Jacob's unique perspective and innovative solutions helped us see our project in a completely new light. Highly recommended!"
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="Emily Rodriguez">
+                            </div>
+                            <div class="author-info">
+                                <h4>Emily Rodriguez</h4>
+                                <p>Design Lead</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★★</div>
+                        <div class="testimonial-content">
+                            "From concept to completion, Jacob's expertise and dedication made the entire process smooth and enjoyable. Outstanding work!"
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="David Wilson">
+                            </div>
+                            <div class="author-info">
+                                <h4>David Wilson</h4>
+                                <p>Project Manager</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="testimonial-card">
+                        <div class="testimonial-rating">★★★★★</div>
+                        <div class="testimonial-content">
+                            "Jacob's attention to detail and creative vision exceeded all expectations. The final result was truly remarkable."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-image">
+                                <img src="/api/placeholder/60/60" alt="Lisa Thompson">
+                            </div>
+                            <div class="author-info">
+                                <h4>Lisa Thompson</h4>
+                                <p>Marketing Director</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>This is just a test for now</h2>
+            <p>Hello whoever is reading this, i hope you are well, i think you are really cool.</p>
+        </div>
+    </div>
+
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>J. Rose</h3>
+                <p>Hello, i will put text.</p>
+                <div class="social-links">
+                    <a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a>
+                    <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                    <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                </div>
+            </div>
+            
+            <div class="footer-section">
+                <h3>Navigation</h3>
+                <ul>
+                    <li><a href="#">Home</a></li>
+                    <li><a href="#">About Me</a></li>
+                    <li><a href="#">Portfolio</a></li>
+                    <li><a href="#">Contact</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h3>Contact</h3>
+                <p>Email: Jacob050108@outlook.com</p>
+                <p>Location: Liverpool, UK</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Code for blobs -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('blob-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas dimensions to window size
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+
+            // Initialize SimplexNoise
+            const simplex = new SimplexNoise();
+            
+            // Create multiple blobs distributed across the screen
+            const blobs = [];
+            
+            // Colors for blobs
+            const colors = [
+                'rgba(249, 209, 209, 0.35)',
+                'rgba(226, 195, 250, 0.35)',
+                'rgba(218, 195, 252, 0.35)',
+                'rgba(195, 203, 250, 0.35)',
+                'rgba(232, 218, 255, 0.35)',
+                'rgba(255, 218, 232, 0.35)'
+            ];
+            
+            // Create blobs with different positions and properties
+            for (let i = 0; i < 15; i++) {
+                blobs.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,  // Just distribute them evenly in viewport
+                    size: Math.random() * 0.2 + 0.1,  // Size relative to screen
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    speed: Math.random() * 0.0002 + 0.0001,
+                    offset: i * 1000,
+                    moveX: Math.random() * 0.0002 - 0.0001,
+                    moveY: Math.random() * 0.0002 - 0.0001
+                });
+            }
+            
+            // Add scroll adjustment
+            let scrollY = 0;
+            window.addEventListener('scroll', function() {
+                scrollY = window.scrollY;
+            });
+            
+            // Animation loop
+            function animate() {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                const time = Date.now();
+                const documentHeight = Math.max(
+                    document.body.scrollHeight,
+                    document.documentElement.scrollHeight
+                );
+                
+                // Draw each blob
+                blobs.forEach(blob => {
+                    // Update blob position with slight movement
+                    blob.x += Math.sin(time * blob.moveX) * 0.5;
+                    
+                    // Handle horizontal wrapping
+                    if (blob.x < -canvas.width * 0.3) blob.x = canvas.width * 1.3;
+                    if (blob.x > canvas.width * 1.3) blob.x = -canvas.width * 0.3;
+                    
+                    // Calculate vertical position based on scroll
+                    // This creates a repeating pattern throughout the document
+                    const visibleRange = canvas.height + 300; // Visible area plus buffer
+                    const scaledScrollY = scrollY * 0.8; // Parallax effect
+                    const relativeY = (blob.y - scaledScrollY) % visibleRange;
+                    
+                    // Create copies of blobs for each screenful of content to ensure coverage
+                    const screenfulls = Math.ceil(documentHeight / visibleRange) + 1;
+                    
+                    for (let i = 0; i < screenfulls; i++) {
+                        const adjustedY = relativeY + (i * visibleRange);
+                        
+                        // Only draw if in or near the visible area (with buffer for smooth transitions)
+                        if (adjustedY > -300 && adjustedY < canvas.height + 300) {
+                            drawBlob(
+                                blob.x, 
+                                adjustedY, 
+                                Math.min(canvas.width, canvas.height) * blob.size,
+                                blob.color,
+                                time * blob.speed + blob.offset
+                            );
+                        }
+                    }
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            // Function to draw a single blob with smooth edges
+            function drawBlob(x, y, radius, color, time) {
+                const points = 25; // Increased number of points for smoother edges
+                const angleStep = (Math.PI * 2) / points;
+                
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                
+                // Create control points for the curve
+                const cp = [];
+                const p = [];
+                
+                // Generate points with noise
+                for (let i = 0; i < points; i++) {
+                    const angle = i * angleStep;
+                    
+                    // Use noise to create organic movement
+                    const noise = (simplex.noise2D(Math.cos(angle) + time, Math.sin(angle) + time) + 1) * 0.5;
+                    const radiusWithNoise = radius * (0.8 + noise * 0.4);
+                    
+                    const pointX = x + Math.cos(angle) * radiusWithNoise;
+                    const pointY = y + Math.sin(angle) * radiusWithNoise;
+                    
+                    p.push({ x: pointX, y: pointY });
+                }
+                
+                // Draw using bezier curves for smoothness
+                ctx.moveTo(p[0].x, p[0].y);
+                
+                // Loop through points and create smooth curves
+                for (let i = 0; i < points; i++) {
+                    const p0 = p[(i - 1 + points) % points];
+                    const p1 = p[i];
+                    const p2 = p[(i + 1) % points];
+                    const p3 = p[(i + 2) % points];
+                    
+                    // Calculate control points for the curve
+                    const cp1x = p1.x + (p2.x - p0.x) * 0.15;
+                    const cp1y = p1.y + (p2.y - p0.y) * 0.15;
+                    const cp2x = p2.x - (p3.x - p1.x) * 0.15;
+                    const cp2y = p2.y - (p3.y - p1.y) * 0.15;
+                    
+                    // Draw bezier curve
+                    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                }
+                
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            // Start animation
+            animate();
+        });
+    </script>
+
+    <!-- Code for header -->
+    <script>
+        // JavaScript to handle header visibility on scroll
+        let lastScrollPosition = 0;
+        const header = document.querySelector('header');
+        const scrollThreshold = 100; // Minimum scroll amount before hiding header
+        
+        // Function to check scroll direction and toggle header visibility
+        function handleScroll() {
+            const currentScrollPosition = window.pageYOffset;
+            
+            // Only hide header after scrolling past the threshold
+            if (currentScrollPosition > scrollThreshold) {
+                // Scrolling down - hide header
+                if (currentScrollPosition > lastScrollPosition) {
+                    header.classList.add('header-hidden');
+                } 
+                // Scrolling up - show header
+                else {
+                    header.classList.remove('header-hidden');
+                }
+            } else {
+                // Always show header when near the top of the page
+                header.classList.remove('header-hidden');
+            }
+            
+            lastScrollPosition = currentScrollPosition;
+        }
+        
+        // Add scroll event listener
+        window.addEventListener('scroll', handleScroll);
+    </script>
+
+    <!-- Code for section animations on scroll -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get all sections
+            const sections = document.querySelectorAll('.section, .card');
+            
+            // Create an Intersection Observer
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    // If the element is in the viewport
+                    if (entry.isIntersecting) {
+                        // Add the visible class
+                        entry.target.classList.add('visible');
+                        // Stop observing the element once it's visible
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, {
+                // Element becomes visible when 20% of it is in the viewport
+                threshold: 0.2,
+                // Start slightly before the element enters the viewport
+                rootMargin: '0px 0px -10% 0px'
+            });
+            
+            // Observe each section
+            sections.forEach(section => {
+                observer.observe(section);
+            });
+        });
+    </script>
+
+    <!-- Adding Font Awesome for social icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/js/all.min.js"></script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
